@@ -1,3 +1,5 @@
+use std::usize;
+
 use chrono::{DateTime, Utc};
 #[derive(Debug)]
 pub struct StylusInputRaw {
@@ -6,6 +8,52 @@ pub struct StylusInputRaw {
     type_: u16,
     code: u16,
     val: i32,
+}
+
+#[derive(Debug)]
+pub struct EventHolder<T> {
+    max_size: usize,
+    elements: Vec<T>,
+}
+
+impl<T> EventHolder<T> {
+    pub fn new(max_size: usize) -> Self {
+        Self {
+            max_size,
+            elements: Vec::with_capacity(max_size),
+        }
+    }
+
+    pub fn push(&mut self, item: T) {
+        if self.elements.len() == self.max_size {
+            self.elements.remove(0); // Remove the oldest element
+        }
+        self.elements.push(item);
+    }
+
+    fn pop(&mut self) -> Option<T> {
+        self.elements.pop()
+    }
+
+    pub fn is_empty(self) -> bool {
+        self.elements.is_empty()
+    }
+    pub fn get_mut(&mut self, index: usize) -> &mut T {
+        &mut self.elements[index]
+    }
+
+    pub fn get_ref(&self, index: usize) -> &T {
+        &self.elements[index]
+    }
+
+    pub fn last(&self) -> &T {
+        &self.elements[self.elements.len() - 1]
+    }
+
+    pub fn last_mut(&mut self) -> &mut T {
+        let len = self.elements.len();
+        &mut self.elements[len - 1]
+    }
 }
 
 pub fn parse_stylus_input(raw_data: &Vec<u8>, size: usize) -> Option<StylusInputRaw> {
@@ -26,17 +74,28 @@ type Position = i32;
 type Pressed = bool;
 
 #[derive(Debug)]
-enum StylusData {
-    X(Position),
-    Y(Position),
+pub enum StylusAction {
+    Tilt(Position),
     Btn1(Pressed),
     Btn2(Pressed),
 }
 
 #[derive(Debug)]
+pub enum StylusCoord {
+    X(i32),
+    Y(i32),
+}
+
+#[derive(Debug)]
+pub enum StylusData {
+    Coord(StylusCoord),
+    Action(StylusAction),
+}
+
+#[derive(Debug)]
 pub struct StylusInput {
-    date: DateTime<Utc>,
-    data: Option<StylusData>,
+    pub date: DateTime<Utc>,
+    pub data: StylusData,
 }
 
 impl StylusInput {
@@ -45,18 +104,24 @@ impl StylusInput {
         let date = DateTime::from_timestamp(timestamp, 0).unwrap();
         let data = match raw.type_ {
             1 => match raw.code {
-                320 => Some(StylusData::Btn1(raw.val >= 1)),
-                331 => Some(StylusData::Btn2(raw.val >= 1)),
+                320 => Some(StylusData::Action(StylusAction::Btn1(raw.val >= 1))),
+                331 => Some(StylusData::Action(StylusAction::Btn2(raw.val >= 1))),
                 _ => None,
             },
             3 => match raw.code {
-                0 => Some(StylusData::X(raw.val)),
-                1 => Some(StylusData::Y(raw.val)),
+                0 => Some(StylusData::Coord(StylusCoord::X(raw.val))),
+                1 => Some(StylusData::Coord(StylusCoord::Y(raw.val))),
                 _ => None,
             },
             _ => None,
         };
-        data.as_ref()?;
-        Some(Self { date, data })
+        data.map(|data| Self { date, data })
     }
+}
+
+#[derive(Debug)]
+pub struct StylusButtonAction {
+    pub x: i32,
+    pub y: i32,
+    pub action: StylusInput,
 }

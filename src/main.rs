@@ -1,4 +1,5 @@
 use alsa::mixer::{Mixer, SelemId};
+use chrono::{DateTime, Utc};
 use clap::Parser;
 use nix::unistd::Uid;
 use std::mem;
@@ -6,6 +7,7 @@ use std::process::Command;
 use std::{fs::File, io::Read};
 
 mod input;
+mod interaction;
 
 /// Get Custom functionality as a tablet in your device
 #[derive(Parser, Debug)]
@@ -102,22 +104,21 @@ fn get_brillo() {
 }
 
 fn rundaemon() {
-    let event_device = "/dev/input/event12";
+    let event_device = "/dev/input/event13";
     let event_size = mem::size_of::<input::StylusInputRaw>();
     let mut f = File::open(event_device).expect("Failed to open input device");
     println!("Started Reading");
     let mut buffer = vec![0u8; event_size];
+    let mut state = interaction::State::new();
     loop {
         if f.read_exact(&mut buffer).is_ok() {
             let r = input::parse_stylus_input(&buffer, event_size);
-            match r {
-                Some(raw) => {
-                    let data = input::StylusInput::from_raw(raw);
-                    if data.is_some() {
-                        dbg!(&data);
-                    }
+            if let Some(raw) = r {
+                let data = input::StylusInput::from_raw(raw);
+                if let Some(data) = data {
+                    state.process(data);
+                    //data.date
                 }
-                None => {}
             }
         } else {
             eprintln!("incomplete event");
