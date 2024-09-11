@@ -1,11 +1,17 @@
 use alsa::mixer::{Mixer, SelemId};
-use chrono::{DateTime, Utc};
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+
 use clap::Parser;
 use nix::unistd::Uid;
+use std::fs::{self, Permissions};
+use std::io::{self, prelude::*, Write};
 use std::mem;
+use std::os::unix::net::{UnixListener, UnixStream};
 use std::process::Command;
+use std::thread;
 use std::{fs::File, io::Read};
 
+mod actions;
 mod input;
 mod interaction;
 
@@ -78,6 +84,14 @@ fn set_volume(v: u64) {
 }
 
 fn set_brillo(v: u32) {
+    let socket_path = "/tmp/example.sock";
+    let mut stream = UnixStream::connect(socket_path).unwrap();
+    //let message = b"Hello, Unix socket!";
+    stream.write_i32::<BigEndian>(v as i32).unwrap();
+    println!("Message sent to the Unix socket.");
+}
+
+fn set_brillo_command(v: u32) {
     let r = Command::new("brillo")
         .arg("-S")
         .arg(format!("{v}"))
@@ -103,7 +117,33 @@ fn get_brillo() {
     }
 }
 
+use std::os::unix::fs::PermissionsExt;
+fn run_socket() -> std::io::Result<()> {
+    let socket_path = "/tmp/example.sock";
+    let _ = fs::remove_file(socket_path);
+    let listener = UnixListener::bind(socket_path)?;
+    let permissions = Permissions::from_mode(0o666);
+    fs::set_permissions(socket_path, permissions)?;
+    for stream in listener.incoming() {
+        match stream {
+            Ok(mut stream) => {
+                let r = stream.read_u32::<BigEndian>();
+                if let Ok(val) = r {
+                    set_brillo_command(val);
+                }
+            }
+            Err(e) => {
+                dbg!(&e);
+            }
+        }
+    }
+    println!("Loop");
+    Ok(())
+}
+
 fn rundaemon() {
+    thread::spawn(run_socket);
+
     let event_device = "/dev/input/event13";
     let event_size = mem::size_of::<input::StylusInputRaw>();
     let mut f = File::open(event_device).expect("Failed to open input device");

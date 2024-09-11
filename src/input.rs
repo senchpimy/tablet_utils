@@ -1,5 +1,3 @@
-use std::usize;
-
 use chrono::{DateTime, Utc};
 #[derive(Debug)]
 pub struct StylusInputRaw {
@@ -31,20 +29,24 @@ impl<T> EventHolder<T> {
         self.elements.push(item);
     }
 
-    fn pop(&mut self) -> Option<T> {
-        self.elements.pop()
+    pub fn to_slice(&self) -> &[T] {
+        &self.elements
     }
 
-    pub fn is_empty(self) -> bool {
-        self.elements.is_empty()
-    }
-    pub fn get_mut(&mut self, index: usize) -> &mut T {
-        &mut self.elements[index]
-    }
+    //fn pop(&mut self) -> Option<T> {
+    //    self.elements.pop()
+    //}
 
-    pub fn get_ref(&self, index: usize) -> &T {
-        &self.elements[index]
-    }
+    //pub fn is_empty(self) -> bool {
+    //    self.elements.is_empty()
+    //}
+    //pub fn get_mut(&mut self, index: usize) -> &mut T {
+    //    &mut self.elements[index]
+    //}
+
+    //pub fn get_ref(&self, index: usize) -> &T {
+    //    &self.elements[index]
+    //}
 
     pub fn last(&self) -> &T {
         &self.elements[self.elements.len() - 1]
@@ -100,8 +102,9 @@ pub struct StylusInput {
 
 impl StylusInput {
     pub fn from_raw(raw: StylusInputRaw) -> Option<Self> {
-        let timestamp = raw.tv_sec + (raw.tv_usec / 1000000);
-        let date = DateTime::from_timestamp(timestamp, 0).unwrap();
+        let timestamp = raw.tv_sec;
+        let nanos = (raw.tv_usec * 1_000) as u32;
+        let date = DateTime::from_timestamp(timestamp, nanos).unwrap();
         let data = match raw.type_ {
             1 => match raw.code {
                 320 => Some(StylusData::Action(StylusAction::Btn1(raw.val >= 1))),
@@ -111,6 +114,10 @@ impl StylusInput {
             3 => match raw.code {
                 0 => Some(StylusData::Coord(StylusCoord::X(raw.val))),
                 1 => Some(StylusData::Coord(StylusCoord::Y(raw.val))),
+                2 => {
+                    //println!("Presion");
+                    None
+                }
                 _ => None,
             },
             _ => None,
