@@ -72,12 +72,11 @@ pub fn parse_stylus_input(raw_data: &Vec<u8>, size: usize) -> Option<StylusInput
     })
 }
 
-type Position = i32;
 type Pressed = bool;
 
 #[derive(Debug)]
 pub enum StylusAction {
-    Tilt(Position),
+    Tilt(StylusCoord),
     Btn1(Pressed),
     Btn2(Pressed),
 }
@@ -109,15 +108,23 @@ impl StylusInput {
             1 => match raw.code {
                 320 => Some(StylusData::Action(StylusAction::Btn1(raw.val >= 1))),
                 331 => Some(StylusData::Action(StylusAction::Btn2(raw.val >= 1))),
+                26 => {
+                    println!("Tilt X");
+                    Some(StylusData::Action(StylusAction::Tilt(StylusCoord::X(
+                        raw.val,
+                    ))))
+                }
+                27 => {
+                    println!("Tilt Y");
+                    Some(StylusData::Action(StylusAction::Tilt(StylusCoord::Y(
+                        raw.val,
+                    ))))
+                }
                 _ => None,
             },
             3 => match raw.code {
                 0 => Some(StylusData::Coord(StylusCoord::X(raw.val))),
                 1 => Some(StylusData::Coord(StylusCoord::Y(raw.val))),
-                2 => {
-                    //println!("Presion");
-                    None
-                }
                 _ => None,
             },
             _ => None,

@@ -3,13 +3,11 @@ use crate::interaction::{ActionType, BtnEvent};
 pub fn match_interaction(interaction: &BtnEvent, path: &mut Vec<(i32, i32)>) -> ActionType {
     let pressed = &interaction.pressed;
     if let Some(released) = interaction.released.as_ref() {
-        dbg!(&released.action.date);
-        dbg!(&pressed.action.date);
         let time_of_event = released.action.date - interaction.pressed.action.date;
         let milis = time_of_event.num_milliseconds();
         let diff_x = (released.x - pressed.x).abs();
         let diff_y = (released.y - pressed.y).abs();
-        let diff_max = 200;
+        let diff_max = 500;
         if milis < 400 && diff_x < diff_max && diff_y < diff_max {
             println!("Punto");
             return ActionType::Point;
@@ -69,8 +67,14 @@ pub fn match_interaction(interaction: &BtnEvent, path: &mut Vec<(i32, i32)>) -> 
     ActionType::Line
 }
 
-pub fn match_interactions(vec: &[BtnEvent]) {
+pub enum Actions {
+    ChangeWallpaper, //Dumbass me
+    None,
+}
+
+pub fn match_interactions(vec: &[BtnEvent]) -> Actions {
     let mut time_vec = Vec::new(); // Guardar para no estar creando
+    println!("AAAAA");
     for item in vec.windows(2) {
         if let [b1, b2] = item {
             //matcheamos el segundo por que si matchea significa que ya matcheo el primero
@@ -78,16 +82,13 @@ pub fn match_interactions(vec: &[BtnEvent]) {
                 match type_ {
                     ActionType::Point => {
                         if let Some(type_) = &b1.type_ {
-                            match type_ {
-                                ActionType::Point => {
-                                    let t1 = b1.released.as_ref().unwrap().action.date;
-                                    //Como ya sabemos que b2 es un Point no hay necesidad de
-                                    //verificar la duracion de cuando se presiono
-                                    let t2 = b2.pressed.action.date;
-                                    let diff = t2 - t1;
-                                    time_vec.insert(0, diff);
-                                }
-                                _ => {}
+                            if let ActionType::Point = type_ {
+                                let t1 = b1.released.as_ref().unwrap().action.date;
+                                //Como ya sabemos que b2 es un Point no hay necesidad de
+                                //verificar la duracion de cuando se presiono
+                                let t2 = b2.pressed.action.date;
+                                let diff = t2 - t1;
+                                time_vec.push(diff);
                             }
                         }
                     }
@@ -97,4 +98,15 @@ pub fn match_interactions(vec: &[BtnEvent]) {
             }
         }
     }
+    let mut num_point = 0;
+    for delta in time_vec.iter().rev() {
+        if delta.num_milliseconds() > 600 {
+            break;
+        }
+        num_point += 1;
+    }
+    if num_point == 1 {
+        return Actions::ChangeWallpaper;
+    }
+    Actions::None
 }

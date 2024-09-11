@@ -132,19 +132,18 @@ fn run_socket() -> std::io::Result<()> {
                     set_brillo_command(val);
                 }
             }
-            Err(e) => {
-                dbg!(&e);
+            Err(_) => {
+                panic!("Error in socket");
             }
         }
     }
-    println!("Loop");
     Ok(())
 }
 
 fn rundaemon() {
     thread::spawn(run_socket);
 
-    let event_device = "/dev/input/event13";
+    let event_device = "/dev/input/event12";
     let event_size = mem::size_of::<input::StylusInputRaw>();
     let mut f = File::open(event_device).expect("Failed to open input device");
     println!("Started Reading");
@@ -157,7 +156,6 @@ fn rundaemon() {
                 let data = input::StylusInput::from_raw(raw);
                 if let Some(data) = data {
                     state.process(data);
-                    //data.date
                 }
             }
         } else {

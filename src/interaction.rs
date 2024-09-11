@@ -1,7 +1,12 @@
-use std::{default, time::Instant};
+use std::time::Instant;
 
-use crate::actions::{self};
-use crate::input::{self, StylusButtonAction};
+use crate::actions::{self, Actions};
+use crate::input::{self, StylusAction, StylusButtonAction, StylusData, StylusInput};
+use once_cell::sync::Lazy;
+use std::env;
+
+static HOME: Lazy<String> =
+    Lazy::new(|| env::var("HOME").expect("HOME environment variable not set"));
 
 #[derive(Debug)]
 pub enum ActionType {
@@ -110,16 +115,22 @@ impl State {
                     path.push((self.latest_x, self.latest_y));
                     self.latest_x_pushed = self.latest_x;
                     self.latest_y_pushed = self.latest_y;
-                    dbg!(path.len());
-                    dbg!("Se supone q cada 20 milis y algo mas");
+                    //dbg!(path.len());
+                    //dbg!("Se supone q cada 20 milis y algo mas");
                 }
-                dbg!(time_diff);
+                //dbg!(time_diff);
             }
             input::StylusData::Action(val) => match val {
                 input::StylusAction::Tilt(_) => todo!(),
                 input::StylusAction::Btn1(val) => {
-                    self.handle_button_event(*val, true, data);
+                    let r = self.handle_button_event(*val, true, data);
                     self.last = LastAction::Btn1;
+                    match r {
+                        Actions::None => {}
+                        Actions::ChangeWallpaper => {
+                            change_wallpaper();
+                        }
+                    }
                 }
                 input::StylusAction::Btn2(val) => {
                     self.handle_button_event(*val, false, data);
@@ -130,7 +141,11 @@ impl State {
         //self.print_button_events();
     }
 
-    fn handle_button_event(&mut self, pressed: bool, events: bool, data: input::StylusInput) {
+    fn handle_button_event(&mut self, pressed: bool, events: bool, data: StylusInput) -> Actions {
+        if let StylusData::Action(StylusAction::Tilt(_)) = data.data {
+            return Actions::None;
+        }
+
         let btn_event = StylusButtonAction {
             x: self.latest_x,
             y: self.latest_y,
@@ -170,7 +185,7 @@ impl State {
             *path = Vec::new();
             *pressed_stated = false;
         }
-        actions::match_interactions(events.to_slice());
+        actions::match_interactions(events.to_slice())
     }
 
     pub fn print_button_events(&self) {
@@ -208,4 +223,13 @@ impl State {
         }
         {}
     }
+}
+
+fn change_wallpaper() {
+    println!("Fondo Cambiado");
+    let script_path = format!("{}/.local/share/bin/swwwallpaper.sh", *HOME);
+    std::process::Command::new(script_path)
+        .arg("-n")
+        .output()
+        .expect("Failed to execute command");
 }
