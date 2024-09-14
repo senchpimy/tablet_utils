@@ -1,0 +1,15 @@
+[Unit]
+Description=Set file permissions at boot
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/chmod 644 /dev/input/event12
+ExecStart=/bin/chmod 644 /dev/input/event13
+ExecStart=/bin/chmod 666 /sys/class/backlight/intel_backlight/brightness
+
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target
+
