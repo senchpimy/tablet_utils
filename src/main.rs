@@ -2,9 +2,7 @@ use alsa::mixer::{Mixer, SelemId};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
 use clap::Parser;
-use nix::unistd::Uid;
 use std::fs::{self, Permissions};
-use std::io::{self, prelude::*, Write};
 use std::mem;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::process::Command;
@@ -43,9 +41,6 @@ struct Args {
 fn main() {
     let args = Args::parse();
     if args.daemon {
-        if !Uid::effective().is_root() {
-            panic!("You must run this executable with root permissions");
-        }
         rundaemon();
     } else if args.volume {
         get_volume();

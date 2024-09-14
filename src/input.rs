@@ -33,9 +33,13 @@ impl<T> EventHolder<T> {
         &self.elements
     }
 
-    //fn pop(&mut self) -> Option<T> {
-    //    self.elements.pop()
-    //}
+    pub fn pop(&mut self) -> Option<T> {
+        self.elements.pop()
+    }
+
+    pub fn len(&self) -> usize {
+        self.elements.len()
+    }
 
     //pub fn is_empty(self) -> bool {
     //    self.elements.is_empty()
@@ -44,9 +48,9 @@ impl<T> EventHolder<T> {
     //    &mut self.elements[index]
     //}
 
-    //pub fn get_ref(&self, index: usize) -> &T {
-    //    &self.elements[index]
-    //}
+    pub fn get_ref(&self, index: usize) -> &T {
+        &self.elements[index]
+    }
 
     pub fn last(&self) -> &T {
         &self.elements[self.elements.len() - 1]

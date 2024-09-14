@@ -1,4 +1,12 @@
-use crate::interaction::{ActionType, BtnEvent};
+use chrono::TimeDelta;
+
+use crate::{
+    input::EventHolder,
+    interaction::{ActionType, BtnEvent},
+};
+
+const MAX_DIFFERENCE_COORDS: i32 = 1000;
+const MAX_TIME_MILIS: i64 = 600;
 
 pub fn match_interaction(interaction: &BtnEvent, path: &mut Vec<(i32, i32)>) -> ActionType {
     let pressed = &interaction.pressed;
@@ -7,8 +15,10 @@ pub fn match_interaction(interaction: &BtnEvent, path: &mut Vec<(i32, i32)>) -> 
         let milis = time_of_event.num_milliseconds();
         let diff_x = (released.x - pressed.x).abs();
         let diff_y = (released.y - pressed.y).abs();
-        let diff_max = 500;
-        if milis < 400 && diff_x < diff_max && diff_y < diff_max {
+        if milis < MAX_TIME_MILIS
+            && diff_x < MAX_DIFFERENCE_COORDS
+            && diff_y < MAX_DIFFERENCE_COORDS
+        {
             println!("Punto");
             return ActionType::Point;
         } else {
@@ -72,41 +82,32 @@ pub enum Actions {
     None,
 }
 
-pub fn match_interactions(vec: &[BtnEvent]) -> Actions {
-    let mut time_vec = Vec::new(); // Guardar para no estar creando
-    println!("AAAAA");
-    for item in vec.windows(2) {
-        if let [b1, b2] = item {
-            //matcheamos el segundo por que si matchea significa que ya matcheo el primero
-            if let Some(type_) = &b2.type_ {
-                match type_ {
-                    ActionType::Point => {
-                        if let Some(type_) = &b1.type_ {
-                            if let ActionType::Point = type_ {
-                                let t1 = b1.released.as_ref().unwrap().action.date;
-                                //Como ya sabemos que b2 es un Point no hay necesidad de
-                                //verificar la duracion de cuando se presiono
-                                let t2 = b2.pressed.action.date;
-                                let diff = t2 - t1;
-                                time_vec.push(diff);
-                            }
+pub fn match_interactions(vec: &mut EventHolder<BtnEvent>) -> Actions {
+    let len = vec.len();
+    if len >= 2 {
+        let b1 = vec.get_ref(len - 1);
+        let b2 = vec.get_ref(len - 2);
+        if let Some(type_) = &b2.type_ {
+            if let ActionType::Point = type_ {
+                if let Some(type_) = &b1.type_ {
+                    if let ActionType::Point = type_ {
+                        let t1 = b1.released.as_ref().unwrap().action.date;
+                        let t2 = b2.pressed.action.date;
+                        let diff = t2 - t1;
+                        if diff.num_milliseconds() < MAX_TIME_MILIS {
+                            dbg!("Elimndaod");
+                            //Eliminamos los ultimos dos elementos tempralmente
+                            //para evitar que se dispare imnediatamente despues de un evento
+                            //pero lo ideal seria simplemente ignorarlos una vez que se realizo un
+                            //match
+                            vec.pop();
+                            vec.pop();
+                            return Actions::ChangeWallpaper;
                         }
                     }
-                    ActionType::Line => {}
-                    ActionType::StraigthLine(_) => {}
                 }
             }
         }
-    }
-    let mut num_point = 0;
-    for delta in time_vec.iter().rev() {
-        if delta.num_milliseconds() > 600 {
-            break;
-        }
-        num_point += 1;
-    }
-    if num_point == 1 {
-        return Actions::ChangeWallpaper;
     }
     Actions::None
 }

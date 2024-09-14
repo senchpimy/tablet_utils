@@ -5,9 +5,6 @@ use crate::input::{self, StylusAction, StylusButtonAction, StylusData, StylusInp
 use once_cell::sync::Lazy;
 use std::env;
 
-static HOME: Lazy<String> =
-    Lazy::new(|| env::var("HOME").expect("HOME environment variable not set"));
-
 #[derive(Debug)]
 pub enum ActionType {
     Point,
@@ -48,7 +45,6 @@ pub struct State {
     latest_y_pushed: i32,
     last: LastAction,
     latest_data_saved: Instant,
-    interactions: input::EventHolder<ActionType>,
     btn1_pressed: bool,
     btn2_pressed: bool,
 }
@@ -66,7 +62,6 @@ impl State {
             btn2_path: Vec::new(),
             last: LastAction::None,
             latest_data_saved: Instant::now(),
-            interactions: input::EventHolder::new(10),
             btn1_pressed: false,
             btn2_pressed: false,
         }
@@ -115,10 +110,7 @@ impl State {
                     path.push((self.latest_x, self.latest_y));
                     self.latest_x_pushed = self.latest_x;
                     self.latest_y_pushed = self.latest_y;
-                    //dbg!(path.len());
-                    //dbg!("Se supone q cada 20 milis y algo mas");
                 }
-                //dbg!(time_diff);
             }
             input::StylusData::Action(val) => match val {
                 input::StylusAction::Tilt(_) => todo!(),
@@ -142,7 +134,8 @@ impl State {
     }
 
     fn handle_button_event(&mut self, pressed: bool, events: bool, data: StylusInput) -> Actions {
-        if let StylusData::Action(StylusAction::Tilt(_)) = data.data {
+        if let StylusData::Action(StylusAction::Btn1(_)) = data.data {
+        } else {
             return Actions::None;
         }
 
@@ -185,7 +178,7 @@ impl State {
             *path = Vec::new();
             *pressed_stated = false;
         }
-        actions::match_interactions(events.to_slice())
+        actions::match_interactions(events)
     }
 
     pub fn print_button_events(&self) {
@@ -225,11 +218,23 @@ impl State {
     }
 }
 
+static HOME: Lazy<String> =
+    Lazy::new(|| env::var("HOME").expect("HOME environment variable not set"));
+
 fn change_wallpaper() {
-    println!("Fondo Cambiado");
     let script_path = format!("{}/.local/share/bin/swwwallpaper.sh", *HOME);
-    std::process::Command::new(script_path)
-        .arg("-n")
+
+    // Use sudo to run the script as a different user
+    let output = std::process::Command::new(script_path)
+        .arg("-n") // Additional argument for the script
         .output()
         .expect("Failed to execute command");
+    if output.status.success() {
+        println!("Command executed successfully!");
+        println!("Output: {}", String::from_utf8_lossy(&output.stdout));
+    } else {
+        println!("Command failed to execute.");
+        println!("Error: {}", String::from_utf8_lossy(&output.stderr));
+        println!("Error: {}", String::from_utf8_lossy(&output.stdout));
+    }
 }
