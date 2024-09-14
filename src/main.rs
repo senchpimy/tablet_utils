@@ -1,12 +1,8 @@
 use alsa::mixer::{Mixer, SelemId};
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
 use clap::Parser;
-use std::fs::{self, Permissions};
 use std::mem;
-use std::os::unix::net::{UnixListener, UnixStream};
 use std::process::Command;
-use std::thread;
 use std::{fs::File, io::Read};
 
 mod actions;
@@ -79,14 +75,6 @@ fn set_volume(v: u64) {
 }
 
 fn set_brillo(v: u32) {
-    let socket_path = "/tmp/example.sock";
-    let mut stream = UnixStream::connect(socket_path).unwrap();
-    //let message = b"Hello, Unix socket!";
-    stream.write_i32::<BigEndian>(v as i32).unwrap();
-    println!("Message sent to the Unix socket.");
-}
-
-fn set_brillo_command(v: u32) {
     let r = Command::new("brillo")
         .arg("-S")
         .arg(format!("{v}"))
@@ -112,36 +100,12 @@ fn get_brillo() {
     }
 }
 
-use std::os::unix::fs::PermissionsExt;
-fn run_socket() -> std::io::Result<()> {
-    let socket_path = "/tmp/example.sock";
-    let _ = fs::remove_file(socket_path);
-    let listener = UnixListener::bind(socket_path)?;
-    let permissions = Permissions::from_mode(0o666);
-    fs::set_permissions(socket_path, permissions)?;
-    for stream in listener.incoming() {
-        match stream {
-            Ok(mut stream) => {
-                let r = stream.read_u32::<BigEndian>();
-                if let Ok(val) = r {
-                    set_brillo_command(val);
-                }
-            }
-            Err(_) => {
-                panic!("Error in socket");
-            }
-        }
-    }
-    Ok(())
-}
-
 fn rundaemon() {
-    thread::spawn(run_socket);
-
-    let event_device = "/dev/input/event12";
+    let event_device = "/dev/input/event13";
     let event_size = mem::size_of::<input::StylusInputRaw>();
     let mut f = File::open(event_device).expect("Failed to open input device");
     println!("Started Reading");
+    println!("AAA");
     let mut buffer = vec![0u8; event_size];
     let mut state = interaction::State::new();
     loop {
@@ -153,6 +117,7 @@ fn rundaemon() {
                     state.process(data);
                 }
             }
+            //println!("btn1 {}, btn2 {}", state.btn1_pressed, state.btn2_pressed);
         } else {
             eprintln!("incomplete event");
         }

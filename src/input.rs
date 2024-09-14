@@ -29,9 +29,9 @@ impl<T> EventHolder<T> {
         self.elements.push(item);
     }
 
-    pub fn to_slice(&self) -> &[T] {
-        &self.elements
-    }
+    //pub fn to_slice(&self) -> &[T] {
+    //    &self.elements
+    //}
 
     pub fn pop(&mut self) -> Option<T> {
         self.elements.pop()
@@ -78,23 +78,25 @@ pub fn parse_stylus_input(raw_data: &Vec<u8>, size: usize) -> Option<StylusInput
 
 type Pressed = bool;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum StylusAction {
     Tilt(StylusCoord),
     Btn1(Pressed),
     Btn2(Pressed),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum StylusCoord {
     X(i32),
     Y(i32),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum StylusData {
     Coord(StylusCoord),
     Action(StylusAction),
+    Pression, // I dont about this one tho
+    Terminator,
 }
 
 #[derive(Debug)]
@@ -109,6 +111,7 @@ impl StylusInput {
         let nanos = (raw.tv_usec * 1_000) as u32;
         let date = DateTime::from_timestamp(timestamp, nanos).unwrap();
         let data = match raw.type_ {
+            0 => Some(StylusData::Terminator),
             1 => match raw.code {
                 320 => Some(StylusData::Action(StylusAction::Btn1(raw.val >= 1))),
                 331 => Some(StylusData::Action(StylusAction::Btn2(raw.val >= 1))),
@@ -124,6 +127,10 @@ impl StylusInput {
                         raw.val,
                     ))))
                 }
+                330 => {
+                    //I dont know but I sometimes get this code
+                    None
+                }
                 _ => None,
             },
             3 => match raw.code {
@@ -131,6 +138,7 @@ impl StylusInput {
                 1 => Some(StylusData::Coord(StylusCoord::Y(raw.val))),
                 _ => None,
             },
+            4 => Some(StylusData::Pression),
             _ => None,
         };
         data.map(|data| Self { date, data })

@@ -1,23 +1,15 @@
 use std::time::Instant;
 
-use crate::actions::{self, Actions};
+use crate::actions::{self, Actions, LineDirection};
 use crate::input::{self, StylusAction, StylusButtonAction, StylusData, StylusInput};
 use once_cell::sync::Lazy;
 use std::env;
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum ActionType {
     Point,
     Line,
     StraigthLine(LineDirection),
-}
-
-#[derive(Debug)]
-pub enum LineDirection {
-    BottomUp,
-    UpBottom,
-    LeftRigth,
-    RigthLeft,
 }
 
 #[derive(Debug)]
@@ -45,8 +37,9 @@ pub struct State {
     latest_y_pushed: i32,
     last: LastAction,
     latest_data_saved: Instant,
-    btn1_pressed: bool,
-    btn2_pressed: bool,
+    pression_status: bool,
+    pub btn1_pressed: bool,
+    pub btn2_pressed: bool,
 }
 
 impl State {
@@ -62,12 +55,29 @@ impl State {
             btn2_path: Vec::new(),
             last: LastAction::None,
             latest_data_saved: Instant::now(),
+            pression_status: false,
             btn1_pressed: false,
             btn2_pressed: false,
         }
     }
 
     pub fn process(&mut self, data: input::StylusInput) {
+        //if data.data == input::StylusData::Terminator {
+        //    //self.de.events = Vec::new();
+        //    self.de.events.push(input::StylusData::Terminator);
+        //} else if matches!(data.data, input::StylusData::Coord(_)) {
+        //    self.de.coords += 1;
+        //} else {
+        //    self.de.events.push(data.data);
+        //    let len = self.de.coords;
+        //    println!(
+        //        "info:
+        //len {}
+        //prim {:?}
+        //",
+        //        len, self.de.events
+        //    );
+        //}
         match &data.data {
             input::StylusData::Coord(val) => {
                 match val {
@@ -113,8 +123,10 @@ impl State {
                 }
             }
             input::StylusData::Action(val) => match val {
-                input::StylusAction::Tilt(_) => todo!(),
+                input::StylusAction::Tilt(_) => {}
                 input::StylusAction::Btn1(val) => {
+                    //ignore val
+                    //let val = self.pression_status;
                     let r = self.handle_button_event(*val, true, data);
                     self.last = LastAction::Btn1;
                     match r {
@@ -122,15 +134,24 @@ impl State {
                         Actions::ChangeWallpaper => {
                             change_wallpaper();
                         }
+                        Actions::ChangeWorkspace(dir) => match dir {
+                            LineDirection::LeftRigth => left_rigth(),
+                            LineDirection::RigthLeft => right_left(),
+                            _ => {}
+                        },
                     }
                 }
                 input::StylusAction::Btn2(val) => {
+                    //Funciona bien en el boton 2
                     self.handle_button_event(*val, false, data);
                     self.last = LastAction::Btn2;
                 }
             },
+            input::StylusData::Pression => {
+                self.pression_status = !self.pression_status;
+            }
+            input::StylusData::Terminator => {}
         }
-        //self.print_button_events();
     }
 
     fn handle_button_event(&mut self, pressed: bool, events: bool, data: StylusInput) -> Actions {
@@ -237,4 +258,24 @@ fn change_wallpaper() {
         println!("Error: {}", String::from_utf8_lossy(&output.stderr));
         println!("Error: {}", String::from_utf8_lossy(&output.stdout));
     }
+}
+
+fn left_rigth() {
+    // hyprctl dispatch workspace +1
+    let output = std::process::Command::new("hyprctl")
+        .arg("dispatch")
+        .arg("workspace")
+        .arg("-1")
+        .output()
+        .expect("Failed to execute command");
+}
+
+fn right_left() {
+    // hyprctl dispatch workspace +1
+    let output = std::process::Command::new("hyprctl")
+        .arg("dispatch")
+        .arg("workspace")
+        .arg("+1")
+        .output()
+        .expect("Failed to execute command");
 }
