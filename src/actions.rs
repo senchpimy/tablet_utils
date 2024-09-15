@@ -16,9 +16,8 @@ const MAX_DIFFERENCE_COORDS: i32 = 1000;
 const MAX_TIME_MILIS: i64 = 500;
 const SCREEN_HEIGTH: i32 = 20000;
 const SCREEN_WIDTH: i32 = 35000;
-const MAX_DISTANCE_LINE: i32 = SCREEN_WIDTH / 8;
 
-pub fn match_interaction(interaction: &BtnEvent, path: &mut Vec<(i32, i32)>) -> ActionType {
+pub fn match_interaction(interaction: &BtnEvent, _path: &mut Vec<(i32, i32)>) -> ActionType {
     let pressed = &interaction.pressed;
     if let Some(released) = interaction.released.as_ref() {
         let time_of_event = released.action.date - interaction.pressed.action.date;
@@ -78,7 +77,10 @@ pub enum Actions {
     None,
 }
 
-pub fn match_interactions(vec: &mut EventHolder<BtnEvent>) -> Actions {
+pub fn match_interactions(vec: &mut EventHolder<BtnEvent>, btn1: bool) -> Actions {
+    if !btn1 {
+        return Actions::None;
+    }
     let len = vec.len();
     if len >= 2 {
         let b1 = vec.get_ref(len - 1);

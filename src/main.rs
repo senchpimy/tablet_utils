@@ -19,7 +19,7 @@ struct Args {
 
     /// Set volumune using alsa
     #[arg(long)]
-    set_volume: Option<u64>,
+    set_volume: Option<u32>,
 
     /// Set brightness using brillo Command
     #[arg(long)]
@@ -61,7 +61,7 @@ fn get_volume() {
     print!("{}", volume_percent as i32);
 }
 
-fn set_volume(v: u64) {
+pub fn set_volume(v: u32) {
     let actual_value: i64 = (65000 / 100) * v as i64;
     let mixer = Mixer::new("default", false).expect("Failed to open mixer");
     let selem_id = SelemId::new("Master", 0);
@@ -74,34 +74,22 @@ fn set_volume(v: u64) {
     }
 }
 
-fn set_brillo(v: u32) {
-    let r = Command::new("brillo")
+pub fn set_brillo(v: u32) {
+    let _r = Command::new("brillo")
         .arg("-S")
         .arg(format!("{v}"))
         .output()
         .expect("failed to execute process");
-    if !r.status.success() {
-        eprintln!(
-            "Error change brightness {}",
-            String::from_utf8_lossy(&r.stderr)
-        );
-    }
 }
 
 fn get_brillo() {
-    let r = Command::new("brillo")
+    let _r = Command::new("brillo")
         .output()
         .expect("failed to execute process");
-    if !r.status.success() {
-        eprintln!(
-            "Error change brightness {}",
-            String::from_utf8_lossy(&r.stderr)
-        );
-    }
 }
 
 fn rundaemon() {
-    let event_device = "/dev/input/event13";
+    let event_device = "/dev/input/event13"; //detectar automaticamente
     let event_size = mem::size_of::<input::StylusInputRaw>();
     let mut f = File::open(event_device).expect("Failed to open input device");
     println!("Started Reading");
@@ -115,6 +103,7 @@ fn rundaemon() {
                 let data = input::StylusInput::from_raw(raw);
                 if let Some(data) = data {
                     state.process(data);
+                    state.handle_live();
                 }
             }
             //println!("btn1 {}, btn2 {}", state.btn1_pressed, state.btn2_pressed);

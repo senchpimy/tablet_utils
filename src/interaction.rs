@@ -1,7 +1,10 @@
 use std::time::Instant;
 
+use std::process::Command;
+
 use crate::actions::{self, Actions, LineDirection};
 use crate::input::{self, StylusAction, StylusButtonAction, StylusData, StylusInput};
+use crate::{set_brillo, set_volume};
 use once_cell::sync::Lazy;
 use std::env;
 
@@ -31,8 +34,8 @@ pub struct State {
     btn2_events: input::EventHolder<BtnEvent>,
     btn1_path: Vec<(i32, i32)>,
     btn2_path: Vec<(i32, i32)>,
-    latest_x: i32,
-    latest_y: i32,
+    pub latest_x: i32,
+    pub latest_y: i32,
     latest_x_pushed: i32,
     latest_y_pushed: i32,
     last: LastAction,
@@ -40,6 +43,35 @@ pub struct State {
     pression_status: bool,
     pub btn1_pressed: bool,
     pub btn2_pressed: bool,
+    btn2_status: bool,
+}
+
+fn map_value(input: u32) -> u32 {
+    (100 - (input - 2000) * 99 / 16000).clamp(1, 100)
+}
+
+fn gui(ventana: bool, abrir: bool) {
+    //eww -c .config/eww/brigth open my-window
+    let ventana = if ventana { "brigth" } else { "vol" };
+    let abrir = if abrir { "open" } else { "close" };
+    let script_path = format!("{}/.config/eww/{}", *HOME, ventana);
+    dbg!(abrir);
+    let output = Command::new("eww")
+        .arg("-c")
+        .arg(script_path)
+        .arg(abrir)
+        .arg("my-window")
+        .output()
+        .expect("failed to execute process");
+    if output.status.success() {
+        // Convierte la salida de bytes a string y la imprime
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        println!("Salida del comando:\n{}", stdout);
+    } else {
+        // En caso de error, muestra el error en stderr
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        println!("Error al ejecutar el comando:\n{}", stderr);
+    }
 }
 
 impl State {
@@ -58,26 +90,24 @@ impl State {
             pression_status: false,
             btn1_pressed: false,
             btn2_pressed: false,
+            btn2_status: false,
+        }
+    }
+
+    pub fn handle_live(&mut self) {
+        if (3_000..17_000).contains(&self.latest_y) {
+            let val = map_value(self.latest_y as u32);
+            if (31_000..35_000).contains(&self.latest_x) {
+                //volumen
+                set_volume(val);
+            } else if (0..4_000).contains(&self.latest_x) {
+                //brillo
+                set_brillo(val);
+            }
         }
     }
 
     pub fn process(&mut self, data: input::StylusInput) {
-        //if data.data == input::StylusData::Terminator {
-        //    //self.de.events = Vec::new();
-        //    self.de.events.push(input::StylusData::Terminator);
-        //} else if matches!(data.data, input::StylusData::Coord(_)) {
-        //    self.de.coords += 1;
-        //} else {
-        //    self.de.events.push(data.data);
-        //    let len = self.de.coords;
-        //    println!(
-        //        "info:
-        //len {}
-        //prim {:?}
-        //",
-        //        len, self.de.events
-        //    );
-        //}
         match &data.data {
             input::StylusData::Coord(val) => {
                 match val {
@@ -142,7 +172,7 @@ impl State {
                     }
                 }
                 input::StylusAction::Btn2(val) => {
-                    //Funciona bien en el boton 2
+                    dbg!(val);
                     self.handle_button_event(*val, false, data);
                     self.last = LastAction::Btn2;
                 }
@@ -155,7 +185,7 @@ impl State {
     }
 
     fn handle_button_event(&mut self, pressed: bool, events: bool, data: StylusInput) -> Actions {
-        if let StylusData::Action(StylusAction::Btn1(_)) = data.data {
+        if let StylusData::Action(StylusAction::Btn1(_) | StylusAction::Btn2(_)) = data.data {
         } else {
             return Actions::None;
         }
@@ -166,17 +196,19 @@ impl State {
             action: data,
         };
 
-        let (events, pressed_stated, path) = if events {
+        let (events, pressed_stated, path, btn1) = if events {
             (
                 &mut self.btn1_events,
                 &mut self.btn1_pressed,
                 &mut self.btn1_path,
+                true,
             )
         } else {
             (
                 &mut self.btn2_events,
                 &mut self.btn2_pressed,
                 &mut self.btn2_path,
+                false,
             )
         };
 
@@ -199,43 +231,8 @@ impl State {
             *path = Vec::new();
             *pressed_stated = false;
         }
-        actions::match_interactions(events)
-    }
-
-    pub fn print_button_events(&self) {
-        match self.last {
-            LastAction::Btn1 => {
-                let button_name = "Button 1";
-                let press_time = self.btn1_events.last().pressed.action.date;
-                let press_coords = (
-                    self.btn1_events.last().pressed.x,
-                    self.btn1_events.last().pressed.y,
-                );
-
-                println!(
-                    "{}: Pressed at {} at coordinates ({}, {})",
-                    button_name, press_time, press_coords.0, press_coords.1
-                );
-                if let Some(release_event) = &self.btn1_events.last().released {
-                    let release_time = release_event.action.date;
-                    let release_coords = (release_event.x, release_event.y);
-                    let duration = release_time - press_time;
-
-                    println!(
-                        "{}: Released at {} at coordinates ({}, {}) after {} seconds",
-                        button_name,
-                        release_time,
-                        release_coords.0,
-                        release_coords.1,
-                        duration.num_seconds()
-                    );
-                    dbg!(&self.btn1_events);
-                }
-            }
-            LastAction::Btn2 => todo!(),
-            LastAction::None => {}
-        }
-        {}
+        dbg!(&self.btn2_pressed);
+        actions::match_interactions(events, btn1)
     }
 }
 
@@ -246,23 +243,14 @@ fn change_wallpaper() {
     let script_path = format!("{}/.local/share/bin/swwwallpaper.sh", *HOME);
 
     // Use sudo to run the script as a different user
-    let output = std::process::Command::new(script_path)
+    let _output = std::process::Command::new(script_path)
         .arg("-n") // Additional argument for the script
         .output()
         .expect("Failed to execute command");
-    if output.status.success() {
-        println!("Command executed successfully!");
-        println!("Output: {}", String::from_utf8_lossy(&output.stdout));
-    } else {
-        println!("Command failed to execute.");
-        println!("Error: {}", String::from_utf8_lossy(&output.stderr));
-        println!("Error: {}", String::from_utf8_lossy(&output.stdout));
-    }
 }
 
 fn left_rigth() {
-    // hyprctl dispatch workspace +1
-    let output = std::process::Command::new("hyprctl")
+    let _output = std::process::Command::new("hyprctl")
         .arg("dispatch")
         .arg("workspace")
         .arg("-1")
@@ -272,7 +260,7 @@ fn left_rigth() {
 
 fn right_left() {
     // hyprctl dispatch workspace +1
-    let output = std::process::Command::new("hyprctl")
+    let _output = std::process::Command::new("hyprctl")
         .arg("dispatch")
         .arg("workspace")
         .arg("+1")
