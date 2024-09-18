@@ -91,64 +91,41 @@ fn get_brillo() {
 }
 
 fn rundaemon() {
-    let event_device = detect_event_device().unwrap(); //detectar automaticamente
     let event_size = mem::size_of::<input::StylusInputRaw>();
-    let mut f = File::open(event_device).expect("Failed to open input device");
-    println!("Started Reading");
-    println!("AAA");
-    let mut buffer = vec![0u8; event_size];
-    let mut state = interaction::State::new();
-    loop {
-        if f.read_exact(&mut buffer).is_ok() {
-            let r = input::parse_stylus_input(&buffer, event_size);
-            if let Some(raw) = r {
-                let data = input::StylusInput::from_raw(raw);
-                if let Some(data) = data {
-                    state.process(data);
-                    state.handle_live();
-                }
-            }
-            //println!("btn1 {}, btn2 {}", state.btn1_pressed, state.btn2_pressed);
-        } else {
-            eprintln!("incomplete event");
-        }
-    }
-}
-fn detect_event_device() -> Option<String> {
-    let devices = vec!["/dev/input/event12", "/dev/input/event13"];
-    let event_size = std::mem::size_of::<input::StylusInputRaw>();
-    let detected_device = Arc::new(Mutex::new(None));
 
-    let mut handles = vec![];
+    // Crear un closure para leer y procesar eventos
+    let read_and_process = |event_device: &'static str| {
+        thread::spawn(move || {
+            // Abrir el dispositivo
+            let mut f = File::open(event_device)
+                .expect(&format!("Failed to open input device: {}", event_device));
+            let mut buffer = vec![0u8; event_size];
+            let mut state = interaction::State::new();
 
-    for device in devices {
-        let device = device.to_string();
-        let detected_device = Arc::clone(&detected_device);
-
-        let handle = thread::spawn(move || {
-            if let Ok(mut f) = File::open(&device) {
-                let mut buffer = vec![0u8; event_size];
-                loop {
-                    if f.read_exact(&mut buffer).is_ok() {
-                        let mut detected = detected_device.lock().unwrap();
-                        if detected.is_none() {
-                            *detected = Some(device.clone());
+            println!("Started Reading from {}", event_device);
+            loop {
+                // Intentar leer del dispositivo
+                if f.read_exact(&mut buffer).is_ok() {
+                    let r = input::parse_stylus_input(&buffer, event_size);
+                    if let Some(raw) = r {
+                        let data = input::StylusInput::from_raw(raw);
+                        if let Some(data) = data {
+                            state.process(data);
+                            state.handle_live();
                         }
-                        break;
                     }
+                } else {
+                    eprintln!("Incomplete event on {}", event_device);
                 }
             }
-        });
+        })
+    };
 
-        handles.push(handle);
-    }
+    // Iniciar los hilos para ambos dispositivos
+    let handle1 = read_and_process("/dev/input/event12");
+    let handle2 = read_and_process("/dev/input/event13");
 
-    // Esperar a que uno de los hilos detecte el dispositivo correcto
-    for handle in handles {
-        let _ = handle.join();
-    }
-
-    // Obtener el dispositivo detectado
-    let detected_device = detected_device.lock().unwrap().clone();
-    detected_device
+    // Esperar a que ambos hilos terminen (nunca sucederá en este caso)
+    handle1.join().unwrap();
+    handle2.join().unwrap();
 }
