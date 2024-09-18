@@ -95,7 +95,7 @@ impl State {
     }
 
     pub fn handle_live(&mut self) {
-        if (3_000..17_000).contains(&self.latest_y) {
+        if (3_000..17_000).contains(&self.latest_y) && self.btn1_path.len() > 30 {
             let val = map_value(self.latest_y as u32);
             if (31_000..35_000).contains(&self.latest_x) {
                 //volumen

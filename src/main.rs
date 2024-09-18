@@ -1,4 +1,6 @@
 use alsa::mixer::{Mixer, SelemId};
+use std::sync::{Arc, Mutex};
+use std::thread;
 
 use clap::Parser;
 use std::mem;
@@ -89,7 +91,7 @@ fn get_brillo() {
 }
 
 fn rundaemon() {
-    let event_device = "/dev/input/event13"; //detectar automaticamente
+    let event_device = detect_event_device().unwrap(); //detectar automaticamente
     let event_size = mem::size_of::<input::StylusInputRaw>();
     let mut f = File::open(event_device).expect("Failed to open input device");
     println!("Started Reading");
@@ -111,4 +113,42 @@ fn rundaemon() {
             eprintln!("incomplete event");
         }
     }
+}
+fn detect_event_device() -> Option<String> {
+    let devices = vec!["/dev/input/event12", "/dev/input/event13"];
+    let event_size = std::mem::size_of::<input::StylusInputRaw>();
+    let detected_device = Arc::new(Mutex::new(None));
+
+    let mut handles = vec![];
+
+    for device in devices {
+        let device = device.to_string();
+        let detected_device = Arc::clone(&detected_device);
+
+        let handle = thread::spawn(move || {
+            if let Ok(mut f) = File::open(&device) {
+                let mut buffer = vec![0u8; event_size];
+                loop {
+                    if f.read_exact(&mut buffer).is_ok() {
+                        let mut detected = detected_device.lock().unwrap();
+                        if detected.is_none() {
+                            *detected = Some(device.clone());
+                        }
+                        break;
+                    }
+                }
+            }
+        });
+
+        handles.push(handle);
+    }
+
+    // Esperar a que uno de los hilos detecte el dispositivo correcto
+    for handle in handles {
+        let _ = handle.join();
+    }
+
+    // Obtener el dispositivo detectado
+    let detected_device = detected_device.lock().unwrap().clone();
+    detected_device
 }
