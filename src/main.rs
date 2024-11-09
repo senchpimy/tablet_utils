@@ -38,6 +38,10 @@ struct Args {
 
 fn main() {
     let args = Args::parse();
+    let r = false;
+    if r != false {
+        println!("");
+    }
     if args.daemon {
         rundaemon();
     } else if args.volume {
@@ -85,9 +89,12 @@ pub fn set_brillo(v: u32) {
 }
 
 fn get_brillo() {
-    let _r = Command::new("brillo")
+    let r = Command::new("brillo")
         .output()
         .expect("failed to execute process");
+    let string = &r.stdout[..2];
+    let string_representation = String::from_utf8(string.to_vec()).unwrap();
+    println!("{}", string_representation);
 }
 
 fn rundaemon() {

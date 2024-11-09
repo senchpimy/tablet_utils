@@ -13,7 +13,8 @@ pub enum LineDirection {
 }
 
 const MAX_DIFFERENCE_COORDS: i32 = 1000;
-const MAX_TIME_MILIS: i64 = 500;
+const MIN_TIME_POINT: i64 = 300;
+const MAX_TIME_LINE: i64 = 500;
 const SCREEN_HEIGTH: i32 = 20000;
 const SCREEN_WIDTH: i32 = 35000;
 
@@ -26,7 +27,7 @@ pub fn match_interaction(interaction: &BtnEvent, _path: &mut Vec<(i32, i32)>) ->
         dbg!(pressed.x);
         let diff_x = (released.x - pressed.x).abs();
         let diff_y = (released.y - pressed.y).abs();
-        if milis < MAX_TIME_MILIS
+        if milis < MIN_TIME_POINT
             && diff_x < MAX_DIFFERENCE_COORDS
             && diff_y < MAX_DIFFERENCE_COORDS
         {
@@ -34,21 +35,28 @@ pub fn match_interaction(interaction: &BtnEvent, _path: &mut Vec<(i32, i32)>) ->
             return ActionType::Point;
         } else {
             //Mejorar sistema para identificar lineas rectas
-            let line_dir = if diff_y < SCREEN_WIDTH / 10 && (300..1000).contains(&milis) {
-                if pressed.x > released.x {
-                    //derecha a izq
-                    LineDirection::RigthLeft
+            let distancia = ((released.x as f64 - pressed.x as f64).powi(2)
+                + (released.y as f64 - pressed.y as f64).powi(2))
+            .sqrt();
+            let line_dir = if distancia > 1000. && milis < MAX_TIME_LINE {
+                if diff_y < SCREEN_WIDTH / 10 && (300..1000).contains(&milis) {
+                    if pressed.x > released.x {
+                        //derecha a izq
+                        LineDirection::RigthLeft
+                    } else {
+                        LineDirection::LeftRigth
+                        //izq a dere
+                    }
+                } else if diff_x < SCREEN_HEIGTH / 7 && (300..1000).contains(&milis) {
+                    if pressed.y > released.y {
+                        LineDirection::BottomUp
+                        //abajo -> arriba
+                    } else {
+                        LineDirection::UpBottom
+                        //arriba -> abajo
+                    }
                 } else {
-                    LineDirection::LeftRigth
-                    //izq a dere
-                }
-            } else if diff_x < SCREEN_HEIGTH / 7 && (300..1000).contains(&milis) {
-                if pressed.y > released.y {
-                    LineDirection::BottomUp
-                    //abajo -> arriba
-                } else {
-                    LineDirection::UpBottom
-                    //arriba -> abajo
+                    LineDirection::None
                 }
             } else {
                 LineDirection::None
@@ -92,7 +100,7 @@ pub fn match_interactions(vec: &mut EventHolder<BtnEvent>, btn1: bool) -> Action
                         let t1 = b1.released.as_ref().unwrap().action.date;
                         let t2 = b2.pressed.action.date;
                         let diff = t2 - t1;
-                        if diff.num_milliseconds() < MAX_TIME_MILIS {
+                        if diff.num_milliseconds() < MAX_TIME_LINE {
                             dbg!("Elimndaod");
                             //Eliminamos los ultimos dos elementos tempralmente
                             //para evitar que se dispare imnediatamente despues de un evento
