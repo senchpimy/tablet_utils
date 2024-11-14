@@ -14,7 +14,7 @@ pub enum LineDirection {
 
 const MAX_DIFFERENCE_COORDS: i32 = 1000;
 const MIN_TIME_POINT: i64 = 300;
-const MAX_TIME_LINE: i64 = 500;
+const MAX_TIME_LINE: i64 = 600;
 const SCREEN_HEIGTH: i32 = 20000;
 const SCREEN_WIDTH: i32 = 35000;
 
@@ -106,8 +106,10 @@ pub fn match_interactions(vec: &mut EventHolder<BtnEvent>, btn1: bool) -> Action
                             //para evitar que se dispare imnediatamente despues de un evento
                             //pero lo ideal seria simplemente ignorarlos una vez que se realizo un
                             //match
-                            vec.pop();
-                            vec.pop();
+                            //if vec.len() >= 2 {
+                            //    vec.pop();
+                            //    vec.pop();
+                            //}
                             return Actions::ChangeWallpaper;
                         }
                     }

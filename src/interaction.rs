@@ -1,3 +1,5 @@
+use chrono::{DateTime, Utc};
+use std::ops::RangeBounds;
 use std::time::Instant;
 
 use std::process::Command;
@@ -46,8 +48,9 @@ pub struct State {
     btn2_status: bool,
 }
 
-fn map_value(input: u32) -> u32 {
-    (100 - (input - 2000) * 99 / 16000).clamp(1, 100)
+fn map_value(input: u32, max: u32) -> u32 {
+    let val = input - 1999;
+    (max - val * (max - 1) / 16000).clamp(1, max)
 }
 
 fn gui(ventana: bool, abrir: bool) {
@@ -95,19 +98,42 @@ impl State {
     }
 
     pub fn handle_live(&mut self) {
-        if (3_000..17_000).contains(&self.latest_y) && self.btn1_path.len() > 30 {
-            let val = map_value(self.latest_y as u32);
-            if (31_000..35_000).contains(&self.latest_x) {
-                //volumen
-                set_volume(val);
-            } else if (0..4_000).contains(&self.latest_x) {
-                //brillo
-                set_brillo(val);
+        if self
+            .btn1_path
+            .iter()
+            .all(|a| (3_000..17_000).contains(&a.1))
+            && self.btn1_path.len() > 30
+        {
+            loop {
+                // To exit this part but no the function
+                if self.latest_y < 2_000 {
+                    break;
+                }
+                if self
+                    .btn1_path
+                    .iter()
+                    .all(|a| (31_000..35_000).contains(&a.0))
+                {
+                    let val = map_value(self.latest_y as u32, 60);
+                    set_volume(val);
+                } else if self.btn1_path.iter().all(|a| (0..4_000).contains(&a.0)) {
+                    let val = map_value(self.latest_y as u32, 100);
+                    set_brillo(val);
+                }
+                break;
             }
         }
     }
 
     pub fn process(&mut self, data: input::StylusInput) {
+        if self.btn2_pressed {
+            let el = self.btn2_events.last();
+            //let tiempo = Instant::now(). - el.pressed.action.date;
+            let tiempo = Utc::now() - el.pressed.action.date;
+            if tiempo.num_milliseconds() >= 1000 {
+                println!("AAAA");
+            }
+        }
         match &data.data {
             input::StylusData::Coord(val) => {
                 match val {
@@ -159,16 +185,18 @@ impl State {
                     //let val = self.pression_status;
                     let r = self.handle_button_event(*val, true, data);
                     self.last = LastAction::Btn1;
-                    match r {
-                        Actions::None => {}
-                        Actions::ChangeWallpaper => {
-                            change_wallpaper();
+                    if self.btn1_pressed {
+                        match r {
+                            Actions::None => {}
+                            Actions::ChangeWallpaper => {
+                                change_wallpaper();
+                            }
+                            Actions::ChangeWorkspace(dir) => match dir {
+                                LineDirection::LeftRigth => left_rigth(),
+                                LineDirection::RigthLeft => right_left(),
+                                _ => {}
+                            },
                         }
-                        Actions::ChangeWorkspace(dir) => match dir {
-                            LineDirection::LeftRigth => left_rigth(),
-                            LineDirection::RigthLeft => right_left(),
-                            _ => {}
-                        },
                     }
                 }
                 input::StylusAction::Btn2(val) => {
@@ -230,8 +258,15 @@ impl State {
             first.type_ = Some(inter);
             *path = Vec::new();
             *pressed_stated = false;
+            let time_pressed =
+                first.released.as_ref().unwrap().action.date - first.pressed.action.date;
+            if !btn1 && time_pressed.num_milliseconds() < 170 {
+                // I dont remember the logic of this I just gonna put the action in here
+                last_workspace();
+            } else {
+                dbg!(time_pressed.num_milliseconds());
+            }
         }
-        dbg!(&self.btn2_pressed);
         actions::match_interactions(events, btn1)
     }
 }
@@ -239,14 +274,22 @@ impl State {
 static HOME: Lazy<String> =
     Lazy::new(|| env::var("HOME").expect("HOME environment variable not set"));
 
+fn last_workspace() {
+    let _output = std::process::Command::new("hyprctl")
+        .arg("dispatch")
+        .arg("workspace")
+        .arg("previous")
+        .output()
+        .expect("Failed to execute command");
+}
 fn change_wallpaper() {
     let script_path = format!("{}/.local/share/bin/swwwallpaper.sh", *HOME);
 
-    // Use sudo to run the script as a different user
     let _output = std::process::Command::new(script_path)
         .arg("-n") // Additional argument for the script
-        .output()
+        .spawn()
         .expect("Failed to execute command");
+    println!("aaaaaaaa")
 }
 
 fn left_rigth() {
