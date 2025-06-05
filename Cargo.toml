@@ -1,7 +1,7 @@
 [package]
 name = "tablet_utils"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 alsa = "0.9.1"
@@ -10,3 +10,5 @@ byteorder = "1.5.0"
 nix = {version="0.29.0", features=["user"]}
 chrono = "0.4"
 once_cell = "1.19.0"
+num-bigint = "0.4"
+num-traits = "0.2"

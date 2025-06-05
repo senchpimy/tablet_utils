@@ -101,8 +101,8 @@ impl State {
         if self
             .btn1_path
             .iter()
-            .all(|a| (3_000..17_000).contains(&a.1))
-            && self.btn1_path.len() > 30
+            .all(|a| (2_000..18_000).contains(&a.1))
+            && self.btn1_path.len() > 20
         {
             loop {
                 // To exit this part but no the function
@@ -185,18 +185,16 @@ impl State {
                     //let val = self.pression_status;
                     let r = self.handle_button_event(*val, true, data);
                     self.last = LastAction::Btn1;
-                    if self.btn1_pressed {
-                        match r {
-                            Actions::None => {}
-                            Actions::ChangeWallpaper => {
-                                change_wallpaper();
-                            }
-                            Actions::ChangeWorkspace(dir) => match dir {
-                                LineDirection::LeftRigth => left_rigth(),
-                                LineDirection::RigthLeft => right_left(),
-                                _ => {}
-                            },
+                    match r {
+                        Actions::None => {}
+                        Actions::ChangeWallpaper => {
+                            change_wallpaper();
                         }
+                        Actions::ChangeWorkspace(dir) => match dir {
+                            LineDirection::LeftRigth => left_rigth(),
+                            LineDirection::RigthLeft => right_left(),
+                            _ => {}
+                        },
                     }
                 }
                 input::StylusAction::Btn2(val) => {

@@ -1,5 +1,5 @@
 use alsa::mixer::{Mixer, SelemId};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 
 use clap::Parser;
@@ -10,6 +10,7 @@ use std::{fs::File, io::Read};
 mod actions;
 mod input;
 mod interaction;
+mod system;
 
 /// Get Custom functionality as a tablet in your device
 #[derive(Parser, Debug)]
@@ -99,40 +100,62 @@ fn get_brillo() {
 
 fn rundaemon() {
     let event_size = mem::size_of::<input::StylusInputRaw>();
+    let sel = [false, false];
+    let sel = Arc::new(RwLock::new(sel));
 
     // Crear un closure para leer y procesar eventos
-    let read_and_process = |event_device: &'static str| {
-        thread::spawn(move || {
-            // Abrir el dispositivo
-            let mut f = File::open(event_device)
-                .expect(&format!("Failed to open input device: {}", event_device));
-            let mut buffer = vec![0u8; event_size];
-            let mut state = interaction::State::new();
+    let read_and_process =
+        |event_device: String, selector: Arc<RwLock<[bool; 2]>>, event: usize| {
+            thread::spawn(move || {
+                // Abrir el dispositivo
+                let mut f = File::open(&event_device)
+                    .expect(&format!("Failed to open input device: {}", &event_device));
+                let mut buffer = vec![0u8; event_size];
+                let mut state = interaction::State::new();
 
-            println!("Started Reading from {}", event_device);
-            loop {
-                // Intentar leer del dispositivo
-                if f.read_exact(&mut buffer).is_ok() {
-                    let r = input::parse_stylus_input(&buffer, event_size);
-                    if let Some(raw) = r {
-                        let data = input::StylusInput::from_raw(raw);
-                        if let Some(data) = data {
-                            state.process(data);
-                            state.handle_live();
-                        }
+                println!("Started Reading from {}", event_device);
+                loop {
+                    let index = if event == 0 { 1 } else { 0 };
+                    if selector.read().unwrap()[index] {
+                        eprintln!("Killed thread {}", event_device);
+                        return;
                     }
-                } else {
-                    eprintln!("Incomplete event on {}", event_device);
+                    if f.read_exact(&mut buffer).is_ok() {
+                        let mut s = selector.write().unwrap();
+                        s[event] = true;
+                        drop(s);
+                        let r = input::parse_stylus_input(&buffer, event_size);
+                        if let Some(raw) = r {
+                            let data = input::StylusInput::from_raw(raw);
+                            if let Some(data) = data {
+                                state.process(data);
+                                state.handle_live();
+                            }
+                        }
+                    } else {
+                        eprintln!("Incomplete event on {}", event_device);
+                    }
                 }
-            }
-        })
-    };
+            })
+        };
 
     // Iniciar los hilos para ambos dispositivos
-    let handle1 = read_and_process("/dev/input/event12");
-    let handle2 = read_and_process("/dev/input/event13");
+    let str = system::find_stylus_device().unwrap();
+
+    match str {
+        Some(mut path) => {
+            dbg!(&path);
+            path = path.replace("/sys/class", "/dev");
+            let handle1 = read_and_process(path, Arc::clone(&sel), 0);
+            handle1.join().unwrap();
+        }
+        None => {
+            println!("Stylus device not found");
+            return;
+        }
+    }
+    //let handle2 = read_and_process("/dev/input/event13", Arc::clone(&sel), 1);
 
     // Esperar a que ambos hilos terminen (nunca sucederá en este caso)
-    handle1.join().unwrap();
-    handle2.join().unwrap();
+    //handle2.join().unwrap();
 }

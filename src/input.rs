@@ -33,9 +33,9 @@ impl<T> EventHolder<T> {
     //    &self.elements
     //}
 
-    pub fn pop(&mut self) -> Option<T> {
-        self.elements.pop()
-    }
+    //pub fn pop(&mut self) -> Option<T> {
+    //    self.elements.pop()
+    //}
 
     pub fn len(&self) -> usize {
         self.elements.len()
